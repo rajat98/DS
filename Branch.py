@@ -6,7 +6,6 @@ from concurrent import futures
 import logging
 import datetime
 
-import os
 import grpc
 import distributed_banking_system_pb2
 import distributed_banking_system_pb2_grpc
@@ -29,11 +28,9 @@ class Branch(distributed_banking_system_pb2_grpc.BankingServiceServicer):
         self.recvMsg = list()
         # iterate the processID of the branches
         self.branch_id_list = list()
-        # TODO: students are expected to store the processID of the branches
-
-    def update_branches(self, branches):
-        self.balance = branches
         self.initialize_stubs()
+
+        # TODO: students are expected to store the processID of the branches
 
     def initialize_stubs(self):
         # Initialize gRPC stubs for communication with other branches
@@ -45,7 +42,6 @@ class Branch(distributed_banking_system_pb2_grpc.BankingServiceServicer):
                 stub = distributed_banking_system_pb2_grpc.BankingServiceStub(channel)
                 self.stubList.append(stub)
 
-    # TODO: students are expected to process requests from both Client and Branch
     def MsgDelivery(self, request, context):
         type = request.type
         response = []
@@ -55,39 +51,60 @@ class Branch(distributed_banking_system_pb2_grpc.BankingServiceServicer):
             case "branch":
                 response = self.process_branch_events(request)
 
-        # self.recvMsg.append(response)
         return distributed_banking_system_pb2.BankingOperationResponse(id=self.id, recv=response)
 
     def process_customer_events(self, request):
         response = list()
+        replica_branch_responses = list()
         for event in request.events:
             match event.interface:
                 case "query":
                     response.append(self.query(event))
                 case "deposit":
-                    response.append(self.deposit(event))
-                    # self.process_branch_events(event)
+                    deposit_response, propagate_deposit_response = self.deposit(event)
+                    response.append(deposit_response)
+                    replica_branch_responses.extend(propagate_deposit_response)
                 case "withdraw":
-                    response.append(self.withdraw(event))
-        # self.process_branch_events(request)
+                    withdraw_response, propagate_withdraw_response = self.withdraw(event)
+                    response.append(withdraw_response)
+                    replica_branch_responses.extend(propagate_withdraw_response)
 
+        replica_branch_dict_responses = []
+        for replica_branch_response in replica_branch_responses:
+            replica_branch_dict_responses.append(protobuf_to_dict(replica_branch_response))
+        self.recvMsg.extend(replica_branch_dict_responses)
+        print(replica_branch_dict_responses)
         return response
 
     def query(self, request):
         return {'interface': 'query', 'result': None, 'balance': self.balance}
 
     def deposit(self, event):
-        self.balance += event.money
-        self.replicate_deposit(event)
-        return {'interface': 'deposit', 'result': 'success'}
+        result = "failed"
+        replica_branch_responses = []
+        try:
+            replica_branch_responses = self.replicate_deposit(event)
+            self.balance += event.money
+            result = "success"
+        except:
+            result = "failed"
+            replica_branch_responses = []
+        response = {'interface': 'deposit', 'result': result}
+        return response, replica_branch_responses
 
     def withdraw(self, event):
         result = "failed"
-        if self.balance >= event.money:
-            self.balance -= event.money
-            self.replicate_withdraw(event)
-            result = "success"
-        return {'interface': 'withdraw', 'result': result}
+        replica_branch_responses = []
+        try:
+            if self.balance >= event.money:
+                replica_branch_responses = self.replicate_withdraw(event)
+                self.balance -= event.money
+                result = "success"
+        except:
+            result = "failed"
+            replica_branch_responses = []
+        response = {'interface': 'withdraw', 'result': result}
+        return response, replica_branch_responses
 
     def process_branch_events(self, request):
         response = list()
@@ -108,29 +125,35 @@ class Branch(distributed_banking_system_pb2_grpc.BankingServiceServicer):
         return {'interface': 'propagate_withdraw', 'result': 'success'}
 
     def replicate_deposit(self, event):
+        replica_branch_responses = []
         for stub in self.stubList:
             response = stub.MsgDelivery(
                 distributed_banking_system_pb2.BankingOperationRequest(id=self.id, type="branch", events=[event]))
             if response.recv[0].result != "success":
                 print(f"Failed to replicate deposit to branch {self.stubList.index(stub) + 1}")
+            replica_branch_responses.append(response)
+        return replica_branch_responses
 
     def replicate_withdraw(self, event):
+        replica_branch_responses = []
         for stub in self.stubList:
             response = stub.MsgDelivery(
-                distributed_banking_system_pb2.BankingOperationRequest(id=id, type="branch", events=[event]))
+                distributed_banking_system_pb2.BankingOperationRequest(id=self.id, type="branch", events=[event]))
             if response.recv[0].result != "success":
                 print(f"Failed to replicate withdrawal to branch {self.stubList.index(stub) + 1}")
+            replica_branch_responses.append(response)
+        return replica_branch_responses
 
 
-def serve(port, id, balance, branch_id_list, result_queue, process_id_list):
+def serve(port, id, balance, branch_id_list, result_queue):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    process_id_list.append(os.getpid())
     distributed_banking_system_pb2_grpc.add_BankingServiceServicer_to_server(Branch(id, balance, branch_id_list),
                                                                              server)
     server.add_insecure_port("[::]:" + port)
     server.start()
     print("Server started, listening on " + port)
     _wait_forever(server)
+    result_queue.put(server)
 
 
 def _wait_forever(server):
@@ -155,13 +178,13 @@ def initialize_branch_servers(branch_id_list):
         for item in parsed_data:
             if item["type"] != "branch":
                 continue
-            # branch_id_list.append(item["id"])
+
             id = item["id"]
             type = item["type"]
             balance = item["balance"]
-            print("ID:", item["id"])
-            print("Type:", item["type"])
-            print("Balance:", item["balance"])
+            # print("ID:", item["id"])
+            # print("Type:", item["type"])
+            # print("Balance:", item["balance"])
 
             process = multiprocessing.Process(target=serve,
                                               args=(str(50050 + int(id)), id, balance, branch_id_list, result_queue))
@@ -172,8 +195,6 @@ def initialize_branch_servers(branch_id_list):
         for process in processes:
             process.join()
 
-        # server = result_queue.get()
-        # server.wait_for_termination()
     except FileNotFoundError:
         print(f"File not found: {input_file_path}")
     except json.JSONDecodeError as e:
@@ -208,12 +229,22 @@ def populate_branch_id_list(branch_id_list):
     except Exception as e:
         print(f"An error occurred: {str(e)}")
 
+
+def protobuf_to_dict(message):
+    result = {}
+    for field, value in message.ListFields():
+        if field.type == field.TYPE_MESSAGE:
+            if field.label == field.LABEL_REPEATED:
+                result[field.name] = [protobuf_to_dict(item) for item in value]
+            else:
+                result[field.name] = protobuf_to_dict(value)
+        else:
+            result[field.name] = value
+    return result
+
+
 if __name__ == "__main__":
     logging.basicConfig()
     branch_id_list = []
     populate_branch_id_list(branch_id_list)
     initialize_branch_servers(branch_id_list)
-
-
-
-

@@ -7,6 +7,25 @@ import distributed_banking_system_pb2_grpc
 import json
 import time
 
+OUTPUT_FILE_PATH = "./Output/output.json"
+
+
+def dict_to_str(res):
+    return str(protobuf_to_dict(res))+"\n"
+
+
+def protobuf_to_dict(message):
+    result = {}
+    for field, value in message.ListFields():
+        if field.type == field.TYPE_MESSAGE:
+            if field.label == field.LABEL_REPEATED:
+                result[field.name] = [protobuf_to_dict(item) for item in value]
+            else:
+                result[field.name] = protobuf_to_dict(value)
+        else:
+            result[field.name] = value
+    return result
+
 
 class Customer:
     def __init__(self, id, events):
@@ -18,7 +37,6 @@ class Customer:
         self.recvMsg = list()
         # pointer for the stub
         self.stub = self.create_stub()
-        # TODO: students are expected to create the Customer stub
 
     def create_stub(self):
         port = str(50050 + int(id))
@@ -27,7 +45,6 @@ class Customer:
         channel = grpc.insecure_channel(address)
         return distributed_banking_system_pb2_grpc.BankingServiceStub(channel)
 
-    # TODO: students are expected to send out the events to the Bank
 
     def execute_events(self):
         banking_service_stub = self.stub
@@ -36,6 +53,21 @@ class Customer:
         response = banking_service_stub.MsgDelivery(
             distributed_banking_system_pb2.BankingOperationRequest(id=id, type="customer", events=events))
         return response
+
+    def update_recvMsg(self, branch_response):
+        branch_dict_response = protobuf_to_dict(branch_response)
+        self.recvMsg.append(branch_dict_response)
+        print(branch_dict_response)
+
+
+def start_customer_process(id, events):
+    customer = Customer(id, events)
+    branch_response = customer.execute_events()
+    customer.update_recvMsg(branch_response)
+
+    output_file = open(OUTPUT_FILE_PATH, "a")
+    output_file.write(dict_to_str(branch_response))
+    output_file.close()
 
 
 if __name__ == '__main__':
@@ -47,30 +79,31 @@ if __name__ == '__main__':
 
     try:
         # Open and read the JSON file
-        with open(input_file_path, 'r') as json_file:
-            # Parse JSON data into a Python list of dictionaries
-            # processes = []
-            # result_queue = multiprocessing.Queue()
-            parsed_data = json.load(json_file)
-            for item in parsed_data:
-                if item["type"] != "customer":
-                    continue
-                # branch_id_list.append(item["id"])
-                id = item["id"]
-                type = item["type"]
-                events = item["events"]
-                print("ID:", item["id"])
-                print("Type:", item["type"])
-                print("Events:", item["events"])
-                print("Will try to greet world ...")
-                customer = Customer(id, events)
-                res.append(customer.execute_events())
-                time.sleep(2)
-                print(res)
-                # Wait for all server processes to finish
-            #     for process in processes:
-            #         process.join()
-            # server = result_queue.get()
+        input_file = open(input_file_path, 'r')
+        # Parse JSON data into a Python list of dictionaries
+        processes = []
+        result_queue = multiprocessing.Queue()
+        parsed_data = json.load(input_file)
+        for item in parsed_data:
+            if item["type"] != "customer":
+                continue
+
+            id = item["id"]
+            type = item["type"]
+            events = item["events"]
+            # print("ID:", item["id"])
+            # print("Type:", item["type"])
+            # print("Events:", item["events"])
+            process = multiprocessing.Process(target=start_customer_process,
+                                              args=(id, events))
+            processes.append(process)
+            process.start()
+
+            # sleep for 3 seconds for event propagation
+            time.sleep(3)
+        for process in processes:
+            process.join()
+        print("Customer process completed\n")
     except FileNotFoundError:
         print(f"File not found: {input_file_path}")
     except json.JSONDecodeError as e:
