@@ -1,4 +1,5 @@
 import multiprocessing
+import os
 import sys
 
 import grpc
@@ -64,6 +65,10 @@ def start_customer_process(id, events):
     customer = Customer(id, events)
     branch_response = customer.executeEvents()
     customer.update_recvMsg(branch_response)
+
+    directory = os.path.dirname(OUTPUT_FILE_PATH)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
     output_file = open(OUTPUT_FILE_PATH, "a")
     output_file.write(dict_to_str(branch_response))
