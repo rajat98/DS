@@ -10,8 +10,8 @@ import time
 OUTPUT_FILE_PATH = "./Output/output.json"
 
 
-def dict_to_str(res):
-    return str(protobuf_to_dict(res))+"\n"
+def dict_to_str(response):
+    return str(protobuf_to_dict(response)) + "\n"
 
 
 def protobuf_to_dict(message):
@@ -36,9 +36,9 @@ class Customer:
         # a list of received messages used for debugging purpose
         self.recvMsg = list()
         # pointer for the stub
-        self.stub = self.create_stub()
+        self.stub = self.createStub()
 
-    def create_stub(self):
+    def createStub(self):
         port = str(50050 + int(id))
 
         address = f"localhost:{port}"
@@ -46,7 +46,7 @@ class Customer:
         return distributed_banking_system_pb2_grpc.BankingServiceStub(channel)
 
 
-    def execute_events(self):
+    def executeEvents(self):
         banking_service_stub = self.stub
         events = self.events
         id = self.id
@@ -62,7 +62,7 @@ class Customer:
 
 def start_customer_process(id, events):
     customer = Customer(id, events)
-    branch_response = customer.execute_events()
+    branch_response = customer.executeEvents()
     customer.update_recvMsg(branch_response)
 
     output_file = open(OUTPUT_FILE_PATH, "a")

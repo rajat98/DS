@@ -30,15 +30,13 @@ class Branch(distributed_banking_system_pb2_grpc.BankingServiceServicer):
         self.branch_id_list = list()
         self.initialize_stubs()
 
-        # TODO: students are expected to store the processID of the branches
-
     def initialize_stubs(self):
         # Initialize gRPC stubs for communication with other branches
         for branch_id in self.branches:
             if branch_id != self.id:
                 port = str(50050 + int(branch_id))
                 address = f"localhost:{port}"
-                channel = grpc.insecure_channel(address)  # Replace with actual addresses
+                channel = grpc.insecure_channel(address)
                 stub = distributed_banking_system_pb2_grpc.BankingServiceStub(channel)
                 self.stubList.append(stub)
 
@@ -72,6 +70,7 @@ class Branch(distributed_banking_system_pb2_grpc.BankingServiceServicer):
         replica_branch_dict_responses = []
         for replica_branch_response in replica_branch_responses:
             replica_branch_dict_responses.append(protobuf_to_dict(replica_branch_response))
+
         self.recvMsg.extend(replica_branch_dict_responses)
         print(replica_branch_dict_responses)
         return response
@@ -152,11 +151,11 @@ def serve(port, id, balance, branch_id_list, result_queue):
     server.add_insecure_port("[::]:" + port)
     server.start()
     print("Server started, listening on " + port)
-    _wait_forever(server)
+    wait_for_termination(server)
     result_queue.put(server)
 
 
-def _wait_forever(server):
+def wait_for_termination(server):
     try:
         while True:
             time.sleep(_ONE_DAY.total_seconds())
