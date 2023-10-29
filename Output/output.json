@@ -98,3 +98,4 @@
 {'id': 48, 'recv': [{'interface': 'withdraw', 'result': 'success'}, {'interface': 'query', 'balance': 420}]}
 {'id': 49, 'recv': [{'interface': 'withdraw', 'result': 'success'}, {'interface': 'query', 'balance': 410}]}
 {'id': 50, 'recv': [{'interface': 'withdraw', 'result': 'success'}, {'interface': 'query', 'balance': 400}]}
+// Part 1: List all the events taken place on each customer

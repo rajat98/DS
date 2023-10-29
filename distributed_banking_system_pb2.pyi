@@ -6,39 +6,45 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class BankingOperationRequest(_message.Message):
-    __slots__ = ["id", "type", "events"]
+    __slots__ = ["id", "type", "customer_requests"]
     ID_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
-    EVENTS_FIELD_NUMBER: _ClassVar[int]
+    CUSTOMER_REQUESTS_FIELD_NUMBER: _ClassVar[int]
     id: int
     type: str
-    events: _containers.RepeatedCompositeFieldContainer[Event]
-    def __init__(self, id: _Optional[int] = ..., type: _Optional[str] = ..., events: _Optional[_Iterable[_Union[Event, _Mapping]]] = ...) -> None: ...
+    customer_requests: _containers.RepeatedCompositeFieldContainer[CustomerRequest]
+    def __init__(self, id: _Optional[int] = ..., type: _Optional[str] = ..., customer_requests: _Optional[_Iterable[_Union[CustomerRequest, _Mapping]]] = ...) -> None: ...
 
 class BankingOperationResponse(_message.Message):
-    __slots__ = ["id", "recv"]
-    ID_FIELD_NUMBER: _ClassVar[int]
-    RECV_FIELD_NUMBER: _ClassVar[int]
-    id: int
-    recv: _containers.RepeatedCompositeFieldContainer[EventResult]
-    def __init__(self, id: _Optional[int] = ..., recv: _Optional[_Iterable[_Union[EventResult, _Mapping]]] = ...) -> None: ...
+    __slots__ = ["event_result"]
+    EVENT_RESULT_FIELD_NUMBER: _ClassVar[int]
+    event_result: _containers.RepeatedCompositeFieldContainer[EventResult]
+    def __init__(self, event_result: _Optional[_Iterable[_Union[EventResult, _Mapping]]] = ...) -> None: ...
 
-class Event(_message.Message):
-    __slots__ = ["id", "interface", "money"]
-    ID_FIELD_NUMBER: _ClassVar[int]
+class CustomerRequest(_message.Message):
+    __slots__ = ["customer_request_id", "interface", "logical_clock", "money"]
+    CUSTOMER_REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     INTERFACE_FIELD_NUMBER: _ClassVar[int]
+    LOGICAL_CLOCK_FIELD_NUMBER: _ClassVar[int]
     MONEY_FIELD_NUMBER: _ClassVar[int]
-    id: int
+    customer_request_id: int
     interface: str
+    logical_clock: int
     money: int
-    def __init__(self, id: _Optional[int] = ..., interface: _Optional[str] = ..., money: _Optional[int] = ...) -> None: ...
+    def __init__(self, customer_request_id: _Optional[int] = ..., interface: _Optional[str] = ..., logical_clock: _Optional[int] = ..., money: _Optional[int] = ...) -> None: ...
 
 class EventResult(_message.Message):
-    __slots__ = ["interface", "result", "balance"]
+    __slots__ = ["id", "customer_request_id", "type", "logical_clock", "interface", "comment"]
+    ID_FIELD_NUMBER: _ClassVar[int]
+    CUSTOMER_REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    LOGICAL_CLOCK_FIELD_NUMBER: _ClassVar[int]
     INTERFACE_FIELD_NUMBER: _ClassVar[int]
-    RESULT_FIELD_NUMBER: _ClassVar[int]
-    BALANCE_FIELD_NUMBER: _ClassVar[int]
+    COMMENT_FIELD_NUMBER: _ClassVar[int]
+    id: int
+    customer_request_id: int
+    type: str
+    logical_clock: int
     interface: str
-    result: str
-    balance: int
-    def __init__(self, interface: _Optional[str] = ..., result: _Optional[str] = ..., balance: _Optional[int] = ...) -> None: ...
+    comment: str
+    def __init__(self, id: _Optional[int] = ..., customer_request_id: _Optional[int] = ..., type: _Optional[str] = ..., logical_clock: _Optional[int] = ..., interface: _Optional[str] = ..., comment: _Optional[str] = ...) -> None: ...

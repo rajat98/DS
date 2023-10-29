@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n distributed_banking_system.proto\x12\x13\x64istributed_banking\"_\n\x17\x42\x61nkingOperationRequest\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04type\x18\x02 \x01(\t\x12*\n\x06\x65vents\x18\x03 \x03(\x0b\x32\x1a.distributed_banking.Event\"V\n\x18\x42\x61nkingOperationResponse\x12\n\n\x02id\x18\x01 \x01(\x05\x12.\n\x04recv\x18\x02 \x03(\x0b\x32 .distributed_banking.EventResult\"5\n\x05\x45vent\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x11\n\tinterface\x18\x02 \x01(\t\x12\r\n\x05money\x18\x03 \x01(\x05\"A\n\x0b\x45ventResult\x12\x11\n\tinterface\x18\x01 \x01(\t\x12\x0e\n\x06result\x18\x02 \x01(\t\x12\x0f\n\x07\x62\x61lance\x18\x03 \x01(\x05\x32|\n\x0e\x42\x61nkingService\x12j\n\x0bMsgDelivery\x12,.distributed_banking.BankingOperationRequest\x1a-.distributed_banking.BankingOperationResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n distributed_banking_system.proto\x12\x13\x64istributed_banking\"t\n\x17\x42\x61nkingOperationRequest\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04type\x18\x02 \x01(\t\x12?\n\x11\x63ustomer_requests\x18\x03 \x03(\x0b\x32$.distributed_banking.CustomerRequest\"R\n\x18\x42\x61nkingOperationResponse\x12\x36\n\x0c\x65vent_result\x18\x01 \x03(\x0b\x32 .distributed_banking.EventResult\"g\n\x0f\x43ustomerRequest\x12\x1b\n\x13\x63ustomer_request_id\x18\x01 \x01(\x05\x12\x11\n\tinterface\x18\x02 \x01(\t\x12\x15\n\rlogical_clock\x18\x03 \x01(\x05\x12\r\n\x05money\x18\x04 \x01(\x05\"\x7f\n\x0b\x45ventResult\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x1b\n\x13\x63ustomer_request_id\x18\x02 \x01(\x05\x12\x0c\n\x04type\x18\x03 \x01(\t\x12\x15\n\rlogical_clock\x18\x04 \x01(\x05\x12\x11\n\tinterface\x18\x05 \x01(\t\x12\x0f\n\x07\x63omment\x18\x06 \x01(\t2|\n\x0e\x42\x61nkingService\x12j\n\x0bMsgDelivery\x12,.distributed_banking.BankingOperationRequest\x1a-.distributed_banking.BankingOperationResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -22,13 +22,13 @@ if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
   _globals['_BANKINGOPERATIONREQUEST']._serialized_start=57
-  _globals['_BANKINGOPERATIONREQUEST']._serialized_end=152
-  _globals['_BANKINGOPERATIONRESPONSE']._serialized_start=154
-  _globals['_BANKINGOPERATIONRESPONSE']._serialized_end=240
-  _globals['_EVENT']._serialized_start=242
-  _globals['_EVENT']._serialized_end=295
-  _globals['_EVENTRESULT']._serialized_start=297
-  _globals['_EVENTRESULT']._serialized_end=362
-  _globals['_BANKINGSERVICE']._serialized_start=364
-  _globals['_BANKINGSERVICE']._serialized_end=488
+  _globals['_BANKINGOPERATIONREQUEST']._serialized_end=173
+  _globals['_BANKINGOPERATIONRESPONSE']._serialized_start=175
+  _globals['_BANKINGOPERATIONRESPONSE']._serialized_end=257
+  _globals['_CUSTOMERREQUEST']._serialized_start=259
+  _globals['_CUSTOMERREQUEST']._serialized_end=362
+  _globals['_EVENTRESULT']._serialized_start=364
+  _globals['_EVENTRESULT']._serialized_end=491
+  _globals['_BANKINGSERVICE']._serialized_start=493
+  _globals['_BANKINGSERVICE']._serialized_end=617
 # @@protoc_insertion_point(module_scope)

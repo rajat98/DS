@@ -29,6 +29,14 @@ class Branch(distributed_banking_system_pb2_grpc.BankingServiceServicer):
         # iterate the processID of the branches
         self.branch_id_list = list()
         self.initialize_stubs()
+        # logical clock
+        self.logical_clock = 0
+
+    def update_logical_clock(self, event_ts):
+        self.logical_clock = 1 + max(self.logical_clock, event_ts)
+
+    def increment_logical_clock(self):
+        self.logical_clock += 1
 
     def initialize_stubs(self):
         # Initialize gRPC stubs for communication with other branches
@@ -40,66 +48,88 @@ class Branch(distributed_banking_system_pb2_grpc.BankingServiceServicer):
                 stub = distributed_banking_system_pb2_grpc.BankingServiceStub(channel)
                 self.stubList.append(stub)
 
+    def record_event_reception(self, request):
+        customer_request = request.customer_requests[0]
+        self.update_logical_clock(customer_request.logical_clock)
+        event = {"id": self.id,
+                 "customer_request_id": customer_request.customer_request_id,
+                 "type": "branch",
+                 "logical_clock": self.logical_clock,
+                 "interface": customer_request.interface,
+                 "comment": f"event_received from {request.type} {request.id}"}
+        return event
+
     def MsgDelivery(self, request, context):
         type = request.type
-        response = []
+        response = [self.record_event_reception(request)]
+
         match type:
             case "customer":
-                response = self.process_customer_events(request)
+                response.extend(self.process_customer_events(request))
             case "branch":
-                response = self.process_branch_events(request)
+                self.process_branch_events(request)
 
-        return distributed_banking_system_pb2.BankingOperationResponse(id=self.id, recv=response)
+        return distributed_banking_system_pb2.BankingOperationResponse(event_result=response)
 
     def process_customer_events(self, request):
         response = list()
         replica_branch_responses = list()
-        for event in request.events:
-            match event.interface:
+        id = request.id
+        type = request.type
+        for customer_request in request.customer_requests:
+            match customer_request.interface:
                 case "query":
-                    response.append(self.query(event))
+                    pass
+                    # response.append(self.query(customer_request, id, type))
                 case "deposit":
-                    deposit_response, propagate_deposit_response = self.deposit(event)
+                    deposit_response, propagate_deposit_response = self.deposit(customer_request, id, type)
                     response.append(deposit_response)
                     replica_branch_responses.extend(propagate_deposit_response)
                 case "withdraw":
-                    withdraw_response, propagate_withdraw_response = self.withdraw(event)
+                    withdraw_response, propagate_withdraw_response = self.withdraw(customer_request, id, type)
                     response.append(withdraw_response)
                     replica_branch_responses.extend(propagate_withdraw_response)
 
         replica_branch_dict_responses = []
-        for replica_branch_response in replica_branch_responses:
-            replica_branch_dict_responses.append(protobuf_to_dict(replica_branch_response))
+        # for replica_branch_response in replica_branch_responses:
+        #     replica_branch_dict_responses.append(protobuf_to_dict(replica_branch_response))
 
         self.recvMsg.extend(replica_branch_dict_responses)
-        print(replica_branch_dict_responses)
-        return response
+        print(replica_branch_responses)
+        return replica_branch_responses
 
-    def query(self, request):
+    def query(self, request, id, type):
         return {'interface': 'query', 'result': None, 'balance': self.balance}
 
-    def deposit(self, event):
-        result = "failed"
+    def deposit(self, customer_request, id, type):
+        # result = "failed"
         replica_branch_responses = []
         try:
-            replica_branch_responses = self.replicate_deposit(event)
-            self.balance += event.money
-            result = "success"
-        except:
-            result = "failed"
+            replica_branch_responses = self.replicate_deposit(customer_request)
+            self.balance += customer_request.money
+            # result = "success"
+        except Exception as e:
+            print(e)
+            # result = "failed"
             replica_branch_responses = []
-        response = {'interface': 'deposit', 'result': result}
+        response = {"id": id,
+                    "customer_request_id": customer_request.customer_request_id,
+                    "type": "branch",
+                    "logical_clock": self.logical_clock,
+                    "interface": customer_request.interface,
+                    "comment": f"event_sent to {type} {id}"}
         return response, replica_branch_responses
 
-    def withdraw(self, event):
+    def withdraw(self, customer_request, id, type):
         result = "failed"
         replica_branch_responses = []
         try:
-            if self.balance >= event.money:
-                replica_branch_responses = self.replicate_withdraw(event)
-                self.balance -= event.money
+            if self.balance >= customer_request.money:
+                replica_branch_responses = self.replicate_withdraw(customer_request)
+                self.balance -= customer_request.money
                 result = "success"
-        except:
+        except  Exception as e:
+            print(e)
             result = "failed"
             replica_branch_responses = []
         response = {'interface': 'withdraw', 'result': result}
@@ -107,7 +137,7 @@ class Branch(distributed_banking_system_pb2_grpc.BankingServiceServicer):
 
     def process_branch_events(self, request):
         response = list()
-        for event in request.events:
+        for event in request.customer_requests:
             match event.interface:
                 case "withdraw":
                     response.append(self.propagate_withdraw(event))
@@ -123,24 +153,55 @@ class Branch(distributed_banking_system_pb2_grpc.BankingServiceServicer):
         self.balance -= request.money
         return {'interface': 'propagate_withdraw', 'result': 'success'}
 
-    def replicate_deposit(self, event):
+    def replicate_deposit(self, customer_request):
         replica_branch_responses = []
-        for stub in self.stubList:
-            response = stub.MsgDelivery(
-                distributed_banking_system_pb2.BankingOperationRequest(id=self.id, type="branch", events=[event]))
-            if response.recv[0].result != "success":
-                print(f"Failed to replicate deposit to branch {self.stubList.index(stub) + 1}")
-            replica_branch_responses.append(response)
+        for id, stub in enumerate(self.stubList, 1):
+            if id >= self.id:
+                id += 1
+            self.increment_logical_clock()
+            customer_request.logical_clock = self.logical_clock
+            customer_request.interface = "propagate_deposit"
+
+            event_ack = {"id": self.id,
+                         "customer_request_id": customer_request.customer_request_id,
+                         "type": "branch",
+                         "logical_clock": self.logical_clock,
+                         "interface": "propagate_deposit",
+                         "comment": f"event_sent to branch {id}"}
+            replica_branch_responses.append(event_ack)
+            replica_branch_response = stub.MsgDelivery(
+                distributed_banking_system_pb2.BankingOperationRequest(id=self.id, type="branch",
+                                                                       customer_requests=[customer_request]))
+            dict_response = protobuf_to_dict(replica_branch_response)
+            replica_branch_responses.extend(dict_response["event_result"])
+            # if response.recv[0].result != "success":
+            #     print(f"Failed to replicate deposit to branch {self.stubList.index(stub) + 1}")
+            # replica_branch_responses.append(response)
         return replica_branch_responses
 
-    def replicate_withdraw(self, event):
+    def replicate_withdraw(self, customer_request):
         replica_branch_responses = []
-        for stub in self.stubList:
-            response = stub.MsgDelivery(
-                distributed_banking_system_pb2.BankingOperationRequest(id=self.id, type="branch", events=[event]))
-            if response.recv[0].result != "success":
-                print(f"Failed to replicate withdrawal to branch {self.stubList.index(stub) + 1}")
-            replica_branch_responses.append(response)
+        for id, stub in enumerate(self.stubList):
+            if id >= self.id:
+                id += 1
+            self.increment_logical_clock()
+            customer_request.logical_clock = self.logical_clock
+            customer_request.interface = "propagate_withdraw"
+            event_ack = {"id": self.id,
+                         "customer_request_id": customer_request.customer_request_id,
+                         "type": "branch",
+                         "logical_clock": self.logical_clock,
+                         "interface": "propagate_withdraw",
+                         "comment": f"event_sent to branch {id}"}
+            replica_branch_responses.append(event_ack)
+            replica_branch_response=stub.MsgDelivery(
+                distributed_banking_system_pb2.BankingOperationRequest(id=self.id, type="branch",
+                                                                       customer_requests=[customer_request]))
+            dict_response=protobuf_to_dict(replica_branch_response)
+            replica_branch_responses.extend(dict_response["event_result"])
+            # if response.recv[0].result != "success":
+            #     print(f"Failed to replicate withdrawal to branch {self.stubList.index(stub) + 1}")
+            # replica_branch_responses.append(response)
         return replica_branch_responses
 
 
