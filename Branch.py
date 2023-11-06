@@ -181,7 +181,7 @@ class Branch(distributed_banking_system_pb2_grpc.BankingServiceServicer):
 
     def replicate_withdraw(self, customer_request):
         replica_branch_responses = []
-        for id, stub in enumerate(self.stubList):
+        for id, stub in enumerate(self.stubList, 1):
             if id >= self.id:
                 id += 1
             self.increment_logical_clock()
